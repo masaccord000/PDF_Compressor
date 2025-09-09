@@ -12,6 +12,7 @@ st.title("📄 PDF圧縮ツール（ZIPアップロード + パスワード解�
 uploaded_zip = st.file_uploader("📤 ZIPファイルをアップロード", type=["zip"])
 password = st.text_input("🔑 ZIPパスワード", type="password")
 quality = st.slider("📉 JPEG圧縮品質（低いほど高圧縮）", min_value=10, max_value=95, value=50)
+scale = st.slider("🔍 DPIスケール（1 = 約72dpi）", min_value=1.0, max_value=3.0, value=1.5, step=0.1)
 
 if uploaded_zip and password:
     with tempfile.TemporaryDirectory() as tmpdir:
@@ -40,8 +41,10 @@ if uploaded_zip and password:
             doc = fitz.open(input_path)
             new_doc = fitz.open()
 
+            matrix = fitz.Matrix(scale, scale)
+
             for page in doc:
-                pix = page.get_pixmap()
+                pix = page.get_pixmap(matrix=matrix)
                 img = Image.frombytes("RGB", [pix.width, pix.height], pix.samples)
 
                 buffer = io.BytesIO()
