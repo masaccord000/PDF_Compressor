@@ -6,7 +6,8 @@ from PIL import Image
 import io
 import tempfile
 
-st.title("🔐 PDF圧縮ツール（ZIPアップロード + パスワード解凍）")
+st.set_page_config(page_title="PDF圧縮ツール", layout="centered")
+st.title("📄 PDF圧縮ツール（ZIPアップロード + パスワード解凍）")
 
 uploaded_zip = st.file_uploader("📤 ZIPファイルをアップロード", type=["zip"])
 password = st.text_input("🔑 ZIPパスワード", type="password")
@@ -41,8 +42,12 @@ if uploaded_zip and password:
 
             for page in doc:
                 pix = page.get_pixmap()
-                img_bytes = pix.tobytes("jpeg", quality=quality)
-                img = Image.open(io.BytesIO(img_bytes))
+                img = Image.frombytes("RGB", [pix.width, pix.height], pix.samples)
+
+                buffer = io.BytesIO()
+                img.save(buffer, format="JPEG", quality=quality)
+                img_bytes = buffer.getvalue()
+
                 rect = fitz.Rect(0, 0, img.width, img.height)
                 new_page = new_doc.new_page(width=rect.width, height=rect.height)
                 new_page.insert_image(rect, stream=img_bytes)
