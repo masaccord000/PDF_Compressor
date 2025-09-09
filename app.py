@@ -1,16 +1,18 @@
 import streamlit as st
 import zipfile
 import os
-import tempfile
+import fitz  # PyMuPDF
+from PIL import Image
 import io
-import aspose.pdf as ap
+import tempfile
 
 st.set_page_config(page_title="PDF圧縮ツール", layout="centered")
 st.title("📄 PDF圧縮ツール（ZIPアップロード + パスワード解凍）")
 
 uploaded_zip = st.file_uploader("📤 ZIPファイルをアップロード", type=["zip"])
 password = st.text_input("🔑 ZIPパスワード", type="password")
-quality = st.slider("📉 画像品質（低いほど高圧縮）", min_value=10, max_value=95, value=50)
+quality = st.slider("📉 JPEG圧縮品質（低いほど高圧縮）", min_value=10, max_value=95, value=50)
+scale = st.slider("🔍 DPIスケール（1 = 約72dpi）", min_value=1.0, max_value=3.0, value=1.5, step=0.1)
 
 if uploaded_zip and password:
     with tempfile.TemporaryDirectory() as tmpdir:
@@ -36,17 +38,26 @@ if uploaded_zip and password:
             input_path = os.path.join(tmpdir, pdf_file)
             output_path = os.path.join(tmpdir, f"compressed_{pdf_file}")
 
-            doc = ap.Document(input_path)
+            doc = fitz.open(input_path)
+            new_doc = fitz.open()
 
-            # 最適化オプションの設定
-            opt = ap.optimization.OptimizationOptions()
-            opt.image_compression_options.compress_images = True
-            opt.image_compression_options.image_quality = quality
-            opt.remove_unused_objects = True
-            opt.remove_unused_streams = True
+            matrix = fitz.Matrix(scale, scale)
 
-            doc.optimize_resources(opt)
-            doc.save(output_path)
+            for page in doc:
+                pix = page.get_pixmap(matrix=matrix)
+                img = Image.frombytes("RGB", [pix.width, pix.height], pix.samples)
+
+                buffer = io.BytesIO()
+                img.save(buffer, format="JPEG", quality=quality)
+                img_bytes = buffer.getvalue()
+
+                rect = fitz.Rect(0, 0, img.width, img.height)
+                new_page = new_doc.new_page(width=rect.width, height=rect.height)
+                new_page.insert_image(rect, stream=img_bytes)
+
+            new_doc.save(output_path)
+            new_doc.close()
+            doc.close()
 
             with open(output_path, "rb") as f:
                 st.download_button(
